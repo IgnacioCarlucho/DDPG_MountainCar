@@ -25,7 +25,6 @@ ACTOR_LEARNING_RATE = 0.0001
 CRITIC_LEARNING_RATE =  0.001
 # Soft target update param
 TAU = 0.001
-
 # ===========================
 #   Utility Parameters
 # ===========================
