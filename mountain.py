@@ -16,49 +16,17 @@ from critic import CriticNetwork
 from ou_noise import OUNoise
 
 
-# ==========================
-#   Training Parameters
-# ==========================
+
 # Base learning rate for the Actor network
 ACTOR_LEARNING_RATE = 0.0001
 # Base learning rate for the Critic Network
 CRITIC_LEARNING_RATE =  0.001
 # Soft target update param
 TAU = 0.001
-# ===========================
-#   Utility Parameters
-# ===========================
-# Render gym env during training
-RENDER_ENV = False
-# Use Gym Monitor
-GYM_MONITOR_EN = True
 # Gym environment
 ENV_NAME = 'MountainCarContinuous-v0'
-# Directory for storing gym results
-MONITOR_DIR = './results/gym_ddpg'
-# Directory for storing tensorboard summary results
-SUMMARY_DIR = './results/tf_ddpg'
 RANDOM_SEED = 1234
 EXPLORE = 70
-
-# ===========================
-#   Tensorflow Summary Ops
-# ===========================
-
-
-def build_summaries():
-    episode_reward = tf.Variable(0.)
-    tf.summary.scalar("Reward", episode_reward)
-    episode_ave_max_q = tf.Variable(0.)
-    tf.summary.scalar("Qmax Value", episode_ave_max_q)
-
-    summary_vars = [episode_reward, episode_ave_max_q]
-    summary_ops = tf.summary.merge_all()
-
-    return summary_ops, summary_vars
-
-    
-
 
 def trainer(epochs=1000, MINIBATCH_SIZE=64, GAMMA = 0.99, epsilon=1.0, min_epsilon=0.01, BUFFER_SIZE=10000, train_indicator=True, render=False):
     with tf.Session() as sess:
@@ -81,8 +49,6 @@ def trainer(epochs=1000, MINIBATCH_SIZE=64, GAMMA = 0.99, epsilon=1.0, min_epsil
 
         sess.run(tf.global_variables_initializer())
         
-        writer = tf.summary.FileWriter(SUMMARY_DIR, sess.graph)
-
         # Initialize target network weights
         actor.update_target_network()
         critic.update_target_network()
