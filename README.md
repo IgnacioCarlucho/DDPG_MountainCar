@@ -24,4 +24,4 @@ Sources:
 - [Pemami's blog](http://pemami4911.github.io/blog/2016/08/21/ddpg-rl.html) 
 - [Implementation of the Ornstein-Uhlenbeck Noise](https://github.com/openai/rllab/blob/master/rllab/exploration_strategies/ou_strategy.py)
 - [Blog about RL](https://medium.com/emergent-future/simple-reinforcement-learning-with-tensorflow-part-8-asynchronous-actor-critic-agents-a3c-c88f72a5e9f2) 
-- [Playing Torch w/ keras](https://yanpanlau.github.io/2016/10/11/Torcs-Keras.html) be careful with this one, I think the code has some errors. 
+- [Playing Torch w/ keras](https://yanpanlau.github.io/2016/10/11/Torcs-Keras.html) Good explanation of how everything works. But be careful beause I think the code has some errors. 
