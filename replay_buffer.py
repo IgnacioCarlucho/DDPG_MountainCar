@@ -5,6 +5,7 @@ Author: Patrick Emami
 from collections import deque
 import random
 import numpy as np
+import pickle
 
 class ReplayBuffer(object):
 
@@ -35,7 +36,7 @@ class ReplayBuffer(object):
         if self.count < batch_size:
             batch = random.sample(self.buffer, self.count)
         else:
-            batch = random.sample(self.buffer, batch_size)
+            batch = random.sample(list(self.buffer), batch_size)
 
         s_batch = np.array([_[0] for _ in batch])
         a_batch = np.array([_[1] for _ in batch])
@@ -48,4 +49,23 @@ class ReplayBuffer(object):
     def clear(self):
         self.deque.clear()
         self.count = 0
+
+    def save(self):
+        print('saving the replay buffer')
+        print('.')
+        file = open('replay_buffer.obj', 'wb')
+        print('..')
+        pickle.dump(self.buffer, file)
+        print('...')
+        print('the replay buffer was saved succesfully')
+
+    def load(self):
+          
+        try:
+            filehandler = open('replay_buffer.obj', 'rb') 
+            self.buffer = pickle.load(filehandler)
+            self.count = len(self.buffer)
+            print('the replay buffer was loaded succesfully')
+        except: 
+            print('there was no file to load')
 

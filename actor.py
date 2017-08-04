@@ -1,6 +1,6 @@
-import tflearn
-import tensorflow as tf
 
+import tensorflow as tf
+import numpy as np
 # ===========================
 #   Actor and Critic DNNs
 # ===========================
@@ -56,16 +56,31 @@ class ActorNetwork(object):
             self.network_params) + len(self.target_network_params)
 
     def create_actor_network(self):
-        inputs = tflearn.input_data(shape=[None, self.s_dim])
-        net = tflearn.fully_connected(inputs, 400, activation='relu')
-        net = tflearn.fully_connected(net, 300, activation='relu')
-        # Final layer weights are init to Uniform[-3e-3, 3e-3]
-        w_init = tflearn.initializations.uniform(minval=-0.03, maxval=0.03)
-        out = tflearn.fully_connected(net, self.a_dim, activation='tanh', weights_init=w_init)
-        # Scale output to -action_bound to action_bound
+
+        # weights initialization
+        w1_initial = np.random.normal(size=(self.s_dim,400)).astype(np.float32)
+        w2_initial = np.random.normal(size=(400,300)).astype(np.float32)
+        w3_initial = np.random.uniform(size=(300,self.a_dim),low= -0.0003, high=0.0003 ).astype(np.float32)
+        # Placeholders
+        inputs = tf.placeholder(tf.float32, shape=[None, self.s_dim])
+        # Layer 1 without BN
+        w1 = tf.Variable(w1_initial)
+        b1 = tf.Variable(tf.zeros([400]))
+        z1 = tf.matmul(inputs,w1)+b1
+        l1 = tf.nn.relu(z1)
+        # Layer 2 without BN
+        w2 = tf.Variable(w2_initial)
+        b2 = tf.Variable(tf.zeros([300]))
+        z2 = tf.matmul(l1,w2)+b2
+        l2 = tf.nn.relu(z2)
+        #output layer
+        w3 = tf.Variable(w3_initial)
+        b3 = tf.Variable(tf.zeros([self.a_dim]))
+        out  = tf.nn.tanh(tf.matmul(l2,w3)+b3)
         scaled_out = tf.multiply(out, self.action_bound)
         self.saver = tf.train.Saver()
         return inputs, out, scaled_out
+
 
     def train(self, inputs, a_gradient):
         self.sess.run(self.optimize, feed_dict={
