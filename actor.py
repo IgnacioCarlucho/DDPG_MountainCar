@@ -1,28 +1,21 @@
 
 import tensorflow as tf
 import numpy as np
-# ===========================
-#   Actor and Critic DNNs
-# ===========================
+
 
 
 class ActorNetwork(object):
-    """
-    Input to the network is the state, output is the action
-    under a deterministic policy.
-    The output layer activation is a tanh to keep the action
-    between -2 and 2
-    """
+    
+  
 
-    def __init__(self, sess, state_dim, action_dim, action_bound, learning_rate, tau):
+    def __init__(self, sess, state_dim, action_dim, action_bound, learning_rate, tau, device='/cpu:0'):
         self.sess = sess
         self.s_dim = state_dim
         self.a_dim = action_dim
         self.action_bound = action_bound
         self.learning_rate = learning_rate
         self.tau = tau
-
-        #self.saver = tf.train.Saver()
+        self.device = device
         # Actor Network
         self.inputs, self.out, self.scaled_out = self.create_actor_network()
 
@@ -40,44 +33,41 @@ class ActorNetwork(object):
             [self.target_network_params[i].assign(tf.multiply(self.network_params[i], self.tau) +
                                                   tf.multiply(self.target_network_params[i], 1. - self.tau))
                 for i in range(len(self.target_network_params))]
+        with tf.device(self.device):     
+            # This gradient will be provided by the critic network
+            self.action_gradient = tf.placeholder(tf.float32, [None, self.a_dim])
 
-        # This gradient will be provided by the critic network
-        self.action_gradient = tf.placeholder(tf.float32, [None, self.a_dim])
+            # Combine the gradients here
+            self.actor_gradients = tf.gradients(self.scaled_out, self.network_params, -self.action_gradient)
 
-        # Combine the gradients here
-        self.actor_gradients = tf.gradients(
-            self.scaled_out, self.network_params, -self.action_gradient)
+            # Optimization Op
+            self.optimize = tf.train.AdamOptimizer(self.learning_rate).apply_gradients(zip(self.actor_gradients, self.network_params))
 
-        # Optimization Op
-        self.optimize = tf.train.AdamOptimizer(self.learning_rate).\
-            apply_gradients(zip(self.actor_gradients, self.network_params))
-
-        self.num_trainable_vars = len(
-            self.network_params) + len(self.target_network_params)
+        self.num_trainable_vars = len(self.network_params) + len(self.target_network_params)
 
     def create_actor_network(self):
-
-        # weights initialization
-        w1_initial = np.random.normal(size=(self.s_dim,400)).astype(np.float32)
-        w2_initial = np.random.normal(size=(400,300)).astype(np.float32)
-        w3_initial = np.random.uniform(size=(300,self.a_dim),low= -0.0003, high=0.0003 ).astype(np.float32)
-        # Placeholders
-        inputs = tf.placeholder(tf.float32, shape=[None, self.s_dim])
-        # Layer 1 without BN
-        w1 = tf.Variable(w1_initial)
-        b1 = tf.Variable(tf.zeros([400]))
-        z1 = tf.matmul(inputs,w1)+b1
-        l1 = tf.nn.relu(z1)
-        # Layer 2 without BN
-        w2 = tf.Variable(w2_initial)
-        b2 = tf.Variable(tf.zeros([300]))
-        z2 = tf.matmul(l1,w2)+b2
-        l2 = tf.nn.relu(z2)
-        #output layer
-        w3 = tf.Variable(w3_initial)
-        b3 = tf.Variable(tf.zeros([self.a_dim]))
-        out  = tf.nn.tanh(tf.matmul(l2,w3)+b3)
-        scaled_out = tf.multiply(out, self.action_bound)
+        with tf.device(self.device):
+            # weights initialization
+            w1_initial = np.random.normal(size=(self.s_dim,400)).astype(np.float32)
+            w2_initial = np.random.normal(size=(400,300)).astype(np.float32)
+            w3_initial = np.random.uniform(size=(300,self.a_dim),low= -0.0003, high=0.0003 ).astype(np.float32)
+            # Placeholders
+            inputs = tf.placeholder(tf.float32, shape=[None, self.s_dim])
+            # Layer 1 without BN
+            w1 = tf.Variable(w1_initial)
+            b1 = tf.Variable(tf.zeros([400]))
+            z1 = tf.matmul(inputs,w1)+b1
+            l1 = tf.nn.relu(z1)
+            # Layer 2 without BN
+            w2 = tf.Variable(w2_initial)
+            b2 = tf.Variable(tf.zeros([300]))
+            z2 = tf.matmul(l1,w2)+b2
+            l2 = tf.nn.relu(z2)
+            #output layer
+            w3 = tf.Variable(w3_initial)
+            b3 = tf.Variable(tf.zeros([self.a_dim]))
+            out  = tf.nn.tanh(tf.matmul(l2,w3)+b3)
+            scaled_out = tf.multiply(out, self.action_bound)
         self.saver = tf.train.Saver()
         return inputs, out, scaled_out
 
@@ -105,12 +95,13 @@ class ActorNetwork(object):
         return self.num_trainable_vars
     
     def save_actor(self):
-        self.saver.save(self.sess,'actor_model.ckpt')
-        #saver.save(self.sess,'actor_model.ckpt')
+        # I am only saving the actor network
+        # this is not good if you need to periodically save and restore the model
+        self.saver.save(self.sess,'./actor_model.ckpt')
         print("Model saved in file: actor_model")
 
     
     def recover_actor(self):
-        self.saver.restore(self.sess,'actor_model.ckpt')
+        self.saver.restore(self.sess,'./actor_model.ckpt')
         #saver.restore(self.sess,'critic_model.ckpt')
     

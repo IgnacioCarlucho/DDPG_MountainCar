@@ -7,13 +7,11 @@ rev1
 import tensorflow as tf
 import numpy as np
 import gym
-from gym import wrappers
-import time
 from replay_buffer import ReplayBuffer
 from actor import ActorNetwork
 from critic import CriticNetwork
 from ou_noise import OUNoise
-
+np.set_printoptions(precision=4)
 
 
 # Base learning rate for the Actor network
@@ -26,6 +24,7 @@ TAU = 0.001
 ENV_NAME = 'MountainCarContinuous-v0'
 RANDOM_SEED = 1234
 EXPLORE = 70
+DEVICE = '/gpu:0'
 
 def trainer(epochs=1000, MINIBATCH_SIZE=40, GAMMA = 0.99, epsilon=1.0, min_epsilon=0.01, BUFFER_SIZE=10000, train_indicator=True, render=False):
     with tf.Session() as sess:
@@ -49,8 +48,8 @@ def trainer(epochs=1000, MINIBATCH_SIZE=40, GAMMA = 0.99, epsilon=1.0, min_epsil
         cell = tf.contrib.rnn.BasicLSTMCell(num_units=300,state_is_tuple=True, reuse = None)
         cell_target = tf.contrib.rnn.BasicLSTMCell(num_units=300,state_is_tuple=True, reuse = None)
         ruido = OUNoise(action_dim, mu = 0.4) # this is the Ornstein-Uhlenbeck Noise
-        actor = ActorNetwork(sess, state_dim, action_dim, action_bound, ACTOR_LEARNING_RATE, TAU)
-        critic = CriticNetwork(sess, state_dim, action_dim, CRITIC_LEARNING_RATE, TAU, cell, cell_target, actor.get_num_trainable_vars())
+        actor = ActorNetwork(sess, state_dim, action_dim, action_bound, ACTOR_LEARNING_RATE, TAU, DEVICE)
+        critic = CriticNetwork(sess, state_dim, action_dim, CRITIC_LEARNING_RATE, TAU, cell, cell_target, actor.get_num_trainable_vars(), DEVICE)
 
 
         sess.run(tf.global_variables_initializer())
@@ -101,9 +100,9 @@ def trainer(epochs=1000, MINIBATCH_SIZE=40, GAMMA = 0.99, epsilon=1.0, min_epsil
                 action_original = actor.predict(np.reshape(state,(1,2))) # + (10. / (10. + i))* np.random.randn(1)
                 action = action_original + max(epsilon,0)*ruido.noise()
 
-                np.set_printoptions(precision=4)
+                
                 # remove comment if you want to see a step by step update
-                print(step,'a',action_original, action,'s', state[0], 'max state', max_state_episode)
+                # print(step,'a',action_original, action,'s', state[0], 'max state', max_state_episode)
                 
                 # 2. take action, see next state and reward : 
                 next_state, reward, done, info = env.step(action)
@@ -139,7 +138,6 @@ def trainer(epochs=1000, MINIBATCH_SIZE=40, GAMMA = 0.99, epsilon=1.0, min_epsil
                         # 5.3 Train Critic! 
                         predicted_q_value, _ = critic.train(s_batch, a_batch, np.reshape(y_i, (MINIBATCH_SIZE, 1)), 20)
                         
-
                         ep_ave_max_q += np.amax(predicted_q_value)
                         
                         # 6 Compute Critic gradient (depends on states and actions)
@@ -147,11 +145,6 @@ def trainer(epochs=1000, MINIBATCH_SIZE=40, GAMMA = 0.99, epsilon=1.0, min_epsil
                         a_outs = actor.predict(s_batch)
                         # 6.2 I calculate the gradients 
                         grads = critic.action_gradients(s_batch, a_outs, 20)
-                        c = np.array(grads)
-                        #print(c.shape)
-                        #print('...')
-                        #print('...',c[0].shape)
-                        #print('...')
                         actor.train(s_batch, grads[0])
 
                         # Update target networks
