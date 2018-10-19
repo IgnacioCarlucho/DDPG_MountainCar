@@ -1,5 +1,3 @@
-
-
 import tensorflow as tf
 import numpy as np
 
@@ -15,7 +13,7 @@ class CriticNetwork(object):
     The action must be obtained from the output of the Actor network.
     """
 
-    def __init__(self, sess, state_dim, action_dim, learning_rate, tau, cell, cell_target, num_actor_vars, device='/cpu:0'):
+    def __init__(self, sess, state_dim, action_dim, learning_rate, tau, num_actor_vars, device='/cpu:0'):
         self.sess = sess
         self.s_dim = state_dim
         self.a_dim = action_dim
@@ -27,12 +25,12 @@ class CriticNetwork(object):
         self.h_size = 300 # the size of the las hidden netowkr before 
         
         # Create the critic network
-        self.inputs, self.action, self.out, self.trainLength = self.create_critic_network(cell, 'rnn')
+        self.inputs, self.action, self.out  = self.create_critic_network('critic')
 
         self.network_params = tf.trainable_variables()[num_actor_vars:]
 
         # Target Network
-        self.target_inputs, self.target_action, self.target_out, self.target_trainLength = self.create_critic_network(cell_target, 'rnn_target')
+        self.target_inputs, self.target_action, self.target_out = self.create_critic_network('critic_target')
 
         self.target_network_params = tf.trainable_variables()[(len(self.network_params) + num_actor_vars):]
 
@@ -51,7 +49,7 @@ class CriticNetwork(object):
             self.optimize = tf.train.AdamOptimizer(self.learning_rate).minimize(self.loss)
             self.action_grads = tf.gradients(self.out, self.action)
 
-    def create_critic_network(self,cell,scope):
+    def create_critic_network(self,scope):
         with tf.device(self.device):
             # weights initialization
             w1_initial = np.random.normal(size=(self.s_dim,400)).astype(np.float32)
@@ -72,20 +70,12 @@ class CriticNetwork(object):
             b2 = tf.Variable(tf.zeros([300]))
             z2 = tf.matmul(l1,w2_i)+ tf.matmul(action,w2_a)+ b2 
             l2 = tf.nn.relu(z2)
-            # RNN
-            # placeholder 
-            trainLength = tf.placeholder(dtype=tf.int32, name = 'trainlengh')
-            # net
-            l2Flat = tf.reshape(slim.flatten(l2),[self.batch_size,trainLength,self.h_size])
-            state_in = cell.zero_state(self.batch_size, tf.float32)
-            rnn,rnn_state = tf.nn.dynamic_rnn(cell= cell,inputs=l2Flat, dtype=tf.float32,initial_state=state_in,scope=scope)
-            rnn = tf.reshape(rnn,shape=[-1,self.h_size])
             #output layer
             w3 = tf.Variable(w3_initial)
             b3 = tf.Variable(tf.zeros([1]))
-            out  = tf.matmul(rnn,w3)+b3 # linear activation
+            out  = tf.matmul(l2,w3)+b3 # linear activation
         self.saver = tf.train.Saver()
-        return inputs, action, out, trainLength
+        return inputs, action, out
 
 
         
@@ -121,33 +111,29 @@ class CriticNetwork(object):
     
 
       
-    def train(self, inputs, action, predicted_q_value, trace_length):
+    def train(self, inputs, action, predicted_q_value):
         return self.sess.run([self.out, self.optimize], feed_dict={
             self.inputs: inputs,
             self.action: action,
-            self.predicted_q_value: predicted_q_value,
-            self.trainLength: trace_length
+            self.predicted_q_value: predicted_q_value
         })
 
-    def predict(self, inputs, action, trace_length):
+    def predict(self, inputs, action):
         return self.sess.run(self.out, feed_dict={
             self.inputs: inputs,
-            self.action: action,
-            self.trainLength: trace_length
+            self.action: action
         })
 
-    def predict_target(self, inputs, action, trace_length):
+    def predict_target(self, inputs, action):
         return self.sess.run(self.target_out, feed_dict={
             self.target_inputs: inputs,
-            self.target_action: action,
-            self.target_trainLength: trace_length
-        })
+            self.target_action: action
+            })
 
-    def action_gradients(self, inputs, actions, trace_length):
+    def action_gradients(self, inputs, actions):
         return self.sess.run(self.action_grads, feed_dict={
             self.inputs: inputs,
-            self.action: actions,
-            self.trainLength: trace_length
+            self.action: actions
         })
 
     def update_target_network(self):

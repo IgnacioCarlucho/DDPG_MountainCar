@@ -11,7 +11,8 @@ from replay_buffer import ReplayBuffer
 from actor import ActorNetwork
 from critic import CriticNetwork
 from ou_noise import OUNoise
-np.set_printoptions(precision=4)
+
+# np.set_printoptions(precision=4)
 
 
 # Base learning rate for the Actor network
@@ -24,7 +25,7 @@ TAU = 0.001
 ENV_NAME = 'MountainCarContinuous-v0'
 RANDOM_SEED = 1234
 EXPLORE = 70
-DEVICE = '/gpu:0'
+DEVICE = '/cpu:0'
 
 def trainer(epochs=1000, MINIBATCH_SIZE=40, GAMMA = 0.99, epsilon=1.0, min_epsilon=0.01, BUFFER_SIZE=10000, train_indicator=True, render=False):
     with tf.Session() as sess:
@@ -41,15 +42,9 @@ def trainer(epochs=1000, MINIBATCH_SIZE=40, GAMMA = 0.99, epsilon=1.0, min_epsil
         action_dim = env.action_space.shape[0]
         action_bound = np.float64(10) # I choose this number since the mountain continuos does not have a boundary
         # Creating agent
-        
-
-        # FOR the RNN
-        #tf.contrib.rnn.core_rnn_cell.BasicLSTMCell from https://github.com/tensorflow/tensorflow/issues/8771
-        cell = tf.contrib.rnn.BasicLSTMCell(num_units=300,state_is_tuple=True, reuse = None)
-        cell_target = tf.contrib.rnn.BasicLSTMCell(num_units=300,state_is_tuple=True, reuse = None)
         ruido = OUNoise(action_dim, mu = 0.4) # this is the Ornstein-Uhlenbeck Noise
         actor = ActorNetwork(sess, state_dim, action_dim, action_bound, ACTOR_LEARNING_RATE, TAU, DEVICE)
-        critic = CriticNetwork(sess, state_dim, action_dim, CRITIC_LEARNING_RATE, TAU, cell, cell_target, actor.get_num_trainable_vars(), DEVICE)
+        critic = CriticNetwork(sess, state_dim, action_dim, CRITIC_LEARNING_RATE, TAU, actor.get_num_trainable_vars(), DEVICE)
 
 
         sess.run(tf.global_variables_initializer())
@@ -62,22 +57,19 @@ def trainer(epochs=1000, MINIBATCH_SIZE=40, GAMMA = 0.99, epsilon=1.0, min_epsil
 
         goal = 0
         max_state = -1.
-
-        
         try:
             critic.recover_critic()
             actor.recover_actor()
             print('********************************')
             print('models restored succesfully')
             print('********************************')
-        except:
+        except tf.errors.NotFoundError:
             print('********************************')
             print('Failed to restore models')
             print('********************************')
 
         
-        
-        for i in xrange(epochs):
+        for i in range(epochs):
 
             state = env.reset()
             state = np.hstack(state)
@@ -87,8 +79,8 @@ def trainer(epochs=1000, MINIBATCH_SIZE=40, GAMMA = 0.99, epsilon=1.0, min_epsil
             step = 0
             max_state_episode = -1
             epsilon -= (epsilon/EXPLORE)
-            if epsilon< min_epsilon:
-                epsilon = min_epsilon
+            epsilon = np.maximum(min_epsilon,epsilon)
+
 
             while (not done):
 
@@ -97,7 +89,7 @@ def trainer(epochs=1000, MINIBATCH_SIZE=40, GAMMA = 0.99, epsilon=1.0, min_epsil
                     
                 #print('step', step)
                 # 1. get action with actor, and add noise
-                action_original = actor.predict(np.reshape(state,(1,2))) # + (10. / (10. + i))* np.random.randn(1)
+                action_original = actor.predict(np.reshape(state,(1,state_dim))) # + (10. / (10. + i))* np.random.randn(1)
                 action = action_original + max(epsilon,0)*ruido.noise()
 
                 
@@ -124,7 +116,7 @@ def trainer(epochs=1000, MINIBATCH_SIZE=40, GAMMA = 0.99, epsilon=1.0, min_epsil
                         # 5. Train critic Network (states,actions, R + gamma* V(s', a')): 
                         # 5.1 Get critic prediction = V(s', a')
                         # the a' is obtained using the actor prediction! or in other words : a' = actor(s')
-                        target_q = critic.predict_target(s2_batch, actor.predict_target(s2_batch),20)
+                        target_q = critic.predict_target(s2_batch, actor.predict_target(s2_batch))
 
                         # 5.2 get y_t where: 
                         y_i = []
@@ -136,7 +128,7 @@ def trainer(epochs=1000, MINIBATCH_SIZE=40, GAMMA = 0.99, epsilon=1.0, min_epsil
 
                         
                         # 5.3 Train Critic! 
-                        predicted_q_value, _ = critic.train(s_batch, a_batch, np.reshape(y_i, (MINIBATCH_SIZE, 1)), 20)
+                        predicted_q_value, _ = critic.train(s_batch, a_batch, np.reshape(y_i, (MINIBATCH_SIZE, 1)))
                         
                         ep_ave_max_q += np.amax(predicted_q_value)
                         
@@ -144,7 +136,7 @@ def trainer(epochs=1000, MINIBATCH_SIZE=40, GAMMA = 0.99, epsilon=1.0, min_epsil
                         # 6.1 therefore I first need to calculate the actions the current actor would take.
                         a_outs = actor.predict(s_batch)
                         # 6.2 I calculate the gradients 
-                        grads = critic.action_gradients(s_batch, a_outs, 20)
+                        grads = critic.action_gradients(s_batch, a_outs)
                         actor.train(s_batch, grads[0])
 
                         # Update target networks
@@ -162,16 +154,17 @@ def trainer(epochs=1000, MINIBATCH_SIZE=40, GAMMA = 0.99, epsilon=1.0, min_epsil
             if done:
                 ruido.reset() 
                 if state[0] > 0.45:
-                    print('****************************************')
-                    print('got it!')
-                    print('****************************************')
+                    #print('****************************************')
+                    #print('got it!')
+                    #print('****************************************')
                     goal += 1
+
             if max_state_episode > max_state:
                 max_state = max_state_episode
-            print('th',i+1,'Step', step,'Reward:',ep_reward,'Pos', next_state[0],'epsilon', epsilon,'goal', goal )
-            print('maxmimum state reach', max_state)
-            print('the reward at the end of the episode,', reward)
-            print('Efficiency', 100.*((goal)/(i+1.)))
+            print('th',i+1,'n steps', step,'R:', round(ep_reward,3),'Pos', round(epsilon,3),'Efficiency', round(100.*((goal)/(i+1.)),3) )
+           
+            
+            # print('Efficiency', 100.*((goal)/(i+1.)))
             
 
         print('*************************')

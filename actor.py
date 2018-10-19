@@ -1,12 +1,10 @@
-
 import tensorflow as tf
 import numpy as np
 
 
 
 class ActorNetwork(object):
-    
-  
+      
 
     def __init__(self, sess, state_dim, action_dim, action_bound, learning_rate, tau, device='/cpu:0'):
         self.sess = sess
@@ -24,8 +22,7 @@ class ActorNetwork(object):
         # Target Network
         self.target_inputs, self.target_out, self.target_scaled_out = self.create_actor_network()
 
-        self.target_network_params = tf.trainable_variables()[
-            len(self.network_params):]
+        self.target_network_params = tf.trainable_variables()[len(self.network_params):]
 
         # Op for periodically updating target network with online network
         # weights
