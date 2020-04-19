@@ -1,7 +1,7 @@
 import tensorflow as tf
 import numpy as np
 
-import tensorflow.contrib.slim as slim
+# import tensorflow.contrib.slim as slim
 
 HIDDEN_1 = 400
 HIDDEN_2 = 300

@@ -63,7 +63,7 @@ def trainer(epochs=1000, MINIBATCH_SIZE=40, GAMMA = 0.99, epsilon=1.0, min_epsil
             print('********************************')
             print('models restored succesfully')
             print('********************************')
-        except tf.errors.NotFoundError:
+        except :
             print('********************************')
             print('Failed to restore models')
             print('********************************')
